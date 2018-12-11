@@ -4,6 +4,7 @@
 
 .DESCRIPTION
     Generate graphed report for all Active Directory objects.
+    Forked and updated by @vhoudoverdov to support the the enumeration of vCenter components.
 
 .PARAMETER CompanyLogo
     Enter URL or UNC path to your desired Company Logo for generated report.
@@ -57,7 +58,7 @@ param (
 	#Logo that will be on the right side, UNC or URL
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path for Side Logo")]
-	[String]$RightLogo = "https://www.psmpartners.com/wp-content/uploads/2017/10/porcaro-stolarek-mete.png",
+	[String]$RightLogo = "",
 	#Title of generated report
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired title for report")]
@@ -217,6 +218,14 @@ $TOPUserTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $TOPGroupsTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $TOPComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $GraphComputerOS = New-Object 'System.Collections.Generic.List[System.Object]'
+$VmwareVmList = New-Object 'System.Collections.Generic.List[System.Object]'
+$OutdatedVMwareTools = New-Object 'System.Collections.Generic.List[System.Object]'
+$OpenSnapshotTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$DatastoreTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$PortGroupTable  = New-Object 'System.Collections.Generic.List[System.Object]'
+$VcenterAlarmTable  = New-Object 'System.Collections.Generic.List[System.Object]'
+$EsxiHostTable  = New-Object 'System.Collections.Generic.List[System.Object]'
+
 
 #Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
 $AllUsers = Get-ADUser -Filter * -Properties *
@@ -1334,7 +1343,133 @@ $ComputersEnabledTable.Add($objULic)
 
 Write-Host "Done!" -ForegroundColor White
 
-$tabarray = @('Dashboard', 'Groups', 'Organizational Units', 'Users', 'Group Policy', 'Computers')
+Write-Host "Working on VMware Report..." -ForegroundColor Green
+
+$VCenterServer = $NULL
+if ($VCenterServer -eq $NULL)
+    {  $VCenterServer = Read-Host -Prompt 'No hard-coded vCenter server name in script, prompting interactively for vCenter Server Name' }
+
+Connect-ViServer $VCenterServer
+$MasterVMList = Get-VM
+
+$AllVirtualMachines = $MasterVMList | select Name,Guest,NumCPU,MemoryGB,ProvisionedSpaceGB,VMHost
+$AllVirtualMachines | %  {  
+
+	$obj = [PSCustomObject]@{
+		'Name'	      = $_.Name
+		'Guest' = $_.Guest
+		'NumCPU' = $_.NumCPU
+	     'MemoryGB'	      = $_.MemoryGB
+		'ProvisionedSpaceGB' = $_.ProvisionedSpaceGB
+		'VMHost' = $_.VMHost	
+	}
+$VmwareVmList.Add($obj)}
+
+$OutofDate = $MasterVMList | where {$_.PowerState -ne "PoweredOff" -and $_.ExtensionData.Guest.ToolsStatus -ne "toolsOk"}
+$ResultantSet = @($OutofDate | select Name,Guest,@{Name="ToolsVersion";Expression={$_.ExtensionData.Guest.Toolsversion}})
+ $ResultantSet | %  {  
+
+	$obj = [PSCustomObject]@{
+		'Name'	      = $_.Name
+		'Guest' = $_.Guest
+		'ToolsVersion' = $_.ToolsVersion
+	}
+
+$OutdatedVMwareTools.Add($obj);
+}
+
+If (($OutdatedVMwareTools).count -eq 0)
+{
+	$OutdatedVMwareTools = [PSCustomObject]@{
+		'Information' = 'All virtual machines have up-to-date VMWare Tools installations'
+	}
+}
+
+$Snapshots = $MasterVMList | Get-Snapshot | select Guest,NumCPU,MemoryGB,ProvisionedSpaceGB
+ 
+ $Snapshots | %  {  
+
+	$obj = [PSCustomObject]@{
+		'Guest'	      = $_.Guest
+		'NumcPU' = $_.NumcPU
+		'MemoryGB' = $_.MemoryGB
+	    'ProvisionedSpaceGB'= $_.ProvisionedSpaceGB
+	}
+
+$OpenSnapshotTable.Add($obj);
+}
+
+If (($OpenSnapshotTable).count -eq 0)
+{
+	$OpenSnapshotTable = [PSCustomObject]@{
+		'Information' = 'There are no open VMWare Snapshots'
+	}
+}
+
+$AllDatastores = Get-Datastore | select Name, FreeSpaceGB, CapacityGB
+ 
+ $AllDatastores | %  {  
+
+	$obj = [PSCustomObject]@{
+		'Name'	      = $_.Name
+		'FreeSpaceGB' = $_.FreeSpaceGB
+		'CapacityGB' = $_.CapacityGB
+	}
+
+$DatastoreTable.Add($obj);
+}
+
+If (($DatastoreTable).count -eq 0)
+{
+	$DatastoreTable = [PSCustomObject]@{
+		'Information' = 'No datastores were found in the virtual infrastructure'
+	}
+}
+
+$AllPortGroups = Get-VirtualPortGroup | select Name, VLanID, VirtualSwitch
+ 
+ $AllPortGroups | %  {  
+
+	$obj = [PSCustomObject]@{
+		'Name'	      = $_.Name
+		'VLanID' = $_.VLanID
+		'VirtualSwitch' = $_.VirtualSwitch
+	}
+
+$PortGroupTable.Add($obj);
+}
+
+If (($PortGroupTable).count -eq 0)
+{
+	$PortGroupTable = [PSCustomObject]@{
+		'Information' = 'No port groups were found in the virtual infrastructure'
+	}
+}
+
+$AllVcenterAlarms = Get-VIEvent | select Username, FullFormattedMessage, CreatedTime
+ 
+ $AllVcenterAlarms | %  {  
+
+	$obj = [PSCustomObject]@{
+		'Username'	      = $_.Username
+		'FullFormattedMessage' = $_.FullFormattedMessage
+		'CreatedTime' = $_.CreatedTime
+
+	}
+
+$VcenterAlarmTable.Add($obj);
+}
+
+If (($VcenterAlarmTable).count -eq 0)
+{
+	$VcenterAlarmTable = [PSCustomObject]@{
+		'Information' = 'No recent vCenter alarms found.'
+	}
+}
+
+Write-Host "Done!" -ForegroundColor White
+
+$tabarray = @('Dashboard', 'Groups', 'Organizational Units', 'Users', 'Group Policy', 'Computers', 'VM Infrastructure')
 
 Write-Host "Compiling Report..." -ForegroundColor Green
 
@@ -1798,6 +1933,54 @@ $FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputerObjOS -DataSe
 $FinalReport.Add($(Get-HTMLContentclose))
 
 $FinalReport.Add($(Get-HTMLTabContentClose))
+
+$FinalReport += get-htmltabcontentopen -TabName $tabarray[6] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+
+$FinalReport += Get-HtmlContentOpen -HeaderText "Virtual Machines"
+$FinalReport += get-htmlColumn1of2
+$FinalReport += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText 'All Virtual Machines'
+$FinalReport += get-htmlcontentdatatable $VmwareVmList -HideFooter
+$FinalReport += Get-HtmlContentClose
+$FinalReport += get-htmlColumnClose
+
+$FinalReport += get-htmlColumn2of2
+$FinalReport += Get-HtmlContentOpen -HeaderText 'Outdated VMWare Tools'
+$FinalReport += get-htmlcontentdatatable $OutdatedVMwareTools -HideFooter
+$FinalReport += Get-HtmlContentClose
+$FinalReport += Get-HtmlContentOpen -HeaderText 'Open VMWare Snapshots'
+$FinalReport += get-htmlcontentdatatable $OpenSnapshotTable -HideFooter
+$FinalReport += Get-HtmlContentClose
+$FinalReport += Get-HtmlContentOpen -HeaderText 'ESXi Hosts'
+$FinalReport += get-htmlcontentdatatable $EsxiHostTable -HideFooter
+$FinalReport += Get-HtmlContentClose
+$FinalReport += get-htmlColumnClose
+
+$FinalReport += Get-HTMLContentOpen -HeaderText "Networking and Storage"
+   
+$FinalReport += Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 2
+$FinalReport += Get-HtmlContentOpen -HeaderText 'Port Groups and VLANs'
+$FinalReport += get-htmlcontentdatatable $PortGroupTable -HideFooter
+$FinalReport += Get-HtmlContentClose
+$FinalReport += get-htmlColumnClose
+
+
+$FinalReport += Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 2
+$FinalReport += Get-HtmlContentOpen -HeaderText 'Datastores'
+$FinalReport += get-htmlcontentdatatable $DatastoreTable -HideFooter
+$FinalReport += Get-HtmlContentClose
+$FinalReport += Get-HtmlContentClose
+$FinalReport += get-htmlColumnClose
+
+$FinalReport += Get-HtmlContentClose
+
+$FinalReport += Get-HTMLContentOpen -HeaderText "vCenter Alarms"
+$FinalReport += Get-HtmlContentOpen -HeaderText 'Recent VCenter Alarms'
+$FinalReport += get-htmlcontentdatatable $VcenterAlarmTable -HideFooter
+$FinalReport += Get-HtmlContentClose
+$FinalReport += Get-HtmlContentClose
+
+$FinalReport += get-htmltabcontentclose
+
 $FinalReport.Add($(Get-HTMLClosePage))
 
 $Day = (Get-Date).Day
