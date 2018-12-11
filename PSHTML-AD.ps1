@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Generate graphed report for all Active Directory objects.
-    Forked and updated by @vhoudoverdov to support the the enumeration of vCenter components.
+    Forked and updated by @vhoudoverdov to support the enumeration of vCenter components.
 
 .PARAMETER CompanyLogo
     Enter URL or UNC path to your desired Company Logo for generated report.
