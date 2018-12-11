@@ -6,4 +6,5 @@ This fork of the PSHTML-AD-Report project adds functionality to the existing rep
 * List of open snapshosts 
 * List of VMs with outdated VMware tools 
 * List of all datastores (current capacity, max capacity) 
-* List of all port groups List of all ESXi host
+* List of all port groups 
+* List of all ESXi host
