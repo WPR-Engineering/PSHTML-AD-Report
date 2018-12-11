@@ -88,6 +88,8 @@ param (
 	#Default template is orange and named "Sample"
 )
 
+ipmo VMware.VimAutomation.Core
+
 Write-Host "Gathering Report Customization..." -ForegroundColor White
 Write-Host "__________________________________" -ForegroundColor White
 (Write-Host -NoNewline "Company Logo (left): " -ForegroundColor Yellow), (Write-Host  $CompanyLogo -ForegroundColor White)
