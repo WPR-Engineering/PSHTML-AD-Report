@@ -45,6 +45,9 @@
     Version: 1.0.3
     Author: Bradley Wyatt
     Date: 12/4/2018
+    Fork Author: Vasken Houdoverdov
+    Fork Date: 12/11/2018
+    Modified: @vhoudoverdov 12/11/2018
     Modified: JBear 12/5/2018
     Bradley Wyatt 12/8/2018
     jporgand 12/6/2018
