@@ -2,7 +2,7 @@
 
 This fork of the PSHTML-AD-Report project adds functionality to the existing report tool so that various metrics can be collected from VMWare infrastructures.
 
-The resulting report will contain the Active Directory reporting provided by the base project bwya77/PSHTML-AD-REPORT, in addition to a new tab that provides reporting on various VMWare metrics obtained from vCenter.
+The resulting report will contain the Active Directory reporting provided by the base project [bwya77/PSHTML-AD-REPORT](https://github.com/bwya77/PSHTML-AD-Report), with a new tab in the report that provides reporting on various VMWare metrics obtained from vCenter.
 
 This script is designed to run from a secure jump station or other secure origin that has read access to both vCenter and Active Directory.
 
